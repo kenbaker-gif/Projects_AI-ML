@@ -1,1 +1,53 @@
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
+import joblib
+from imblearn.over_sampling import SMOTE
 
+# Load the dataset
+dataset_path = "SMSSpamCollection"  # Make sure the file is uploaded in Colab
+data = pd.read_csv(dataset_path, sep='\t', header=None, names=['label', 'text'], encoding='utf-8', on_bad_lines='skip')
+
+# Convert labels to binary (0 = ham, 1 = spam)
+data['label'] = data['label'].map({'ham': 0, 'spam': 1})
+
+# Remove any potential missing values
+data.dropna(inplace=True)
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(
+    data['text'], data['label'], test_size=0.2, random_state=42
+)
+
+# Use n-grams (bigrams) and TF-IDF vectorizer
+tfidf = TfidfVectorizer(stop_words='english', max_features=50000, ngram_range=(1, 2))  # ngram_range=(1,2) for unigrams and bigrams
+X_train_tfidf = tfidf.fit_transform(X_train)
+X_test_tfidf = tfidf.transform(X_test)
+
+# Apply SMOTE to handle class imbalance in the training set
+smote = SMOTE(random_state=42)
+X_train_smote, y_train_smote = smote.fit_resample(X_train_tfidf, y_train)
+
+# Choose a model (Logistic Regression or Random Forest)
+model = LogisticRegression(max_iter=1000)  # Initialize the model here, you can choose RandomForestClassifier() as well
+
+# Train the model
+model.fit(X_train_smote, y_train_smote)
+
+# Save the trained model
+joblib.dump(model, "spam_classifier3.pkl")
+
+# Saving the tfidf
+joblib.dump(tfidf, "tfidf_vectorizer3.pkl") # Save the fitted TF-IDF vectorizer
+
+# Evaluate the model
+y_pred = model.predict(X_test_tfidf)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy * 100:.2f}%")
+print(classification_report(y_test, y_pred))
+
+# Optional: Display class distribution
+print(data['label'].value_counts())
